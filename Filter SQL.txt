@@ -1,0 +1,74 @@
+asg.effective_latest_change = 'Y'
+    AND asg.assignment_type in ('E','C')
+    AND asg.primary_assignment_flag = 'Y'
+    AND pay_report_utils.get_parameter_value_date('EFFECTIVE_DATE') BETWEEN asg.effective_start_date AND asg.effective_end_date
+    AND asg.system_person_type in ('EMP','CWK')
+    AND EXISTS (
+        SELECT 1
+        FROM
+            per_person_types_tl pptl
+        WHERE
+            pptl.person_type_id = asg.person_type_id
+            AND pptl.LANGUAGE = 'US'
+            AND pptl.user_person_type IN ( 'Employee',
+'Fixed Term Contractor',
+'Temporary',
+'Consultant',
+'Agency Worker',
+'Independent Contractor',
+'APAC Fixed Term Contract',
+'APAC Maximum Term Contract')
+    )
+AND EXISTS (
+                SELECT 1 
+                FROM per_periods_of_service ppos
+                WHERE 
+                ppos.person_id=asg.person_id
+                AND ppos.period_of_service_id=asg.period_of_service_id
+                AND ppos.period_type in ('E','C')
+                AND ppos.date_start=(SELECT MAX(ppos1.date_start) 
+                                     FROM per_periods_of_service ppos1 
+                                     WHERE  ppos1.person_id=ppos.person_id
+                                         
+                                         AND ppos1.period_type in ('E','C')
+									 )
+               AND ((ppos.actual_termination_date IS NULL) 
+					OR ((ppos.actual_termination_date BETWEEN TO_DATE('2023/01/01','YYYY/MM/DD') AND pay_report_utils.get_parameter_value_date('EFFECTIVE_DATE') )
+					 AND NOT EXISTS ( SELECT 1 from per_all_assignments_m paam2
+														where 
+														paam2.effective_latest_change = 'Y'
+														and paam2.person_id=ASG.person_id
+														and paam2.assignment_status_type='ACTIVE'
+														AND paam2.assignment_type in ('E','C')
+														AND paam2.primary_assignment_flag = 'Y'
+														AND pay_report_utils.get_parameter_value_date('EFFECTIVE_DATE') BETWEEN paam2.effective_start_date AND paam2.effective_end_date
+														AND paam2.system_person_type in ('EMP','CWK')
+																	AND EXISTS (
+																		SELECT 1
+																		FROM
+																			per_person_types_tl pptl
+																		WHERE
+																			pptl.person_type_id = paam2.person_type_id
+																			AND pptl.LANGUAGE = 'US'
+																			AND pptl.user_person_type IN ( 'Employee',
+																											'Fixed Term Contractor',
+																											'Temporary',
+																											'Consultant',
+																											'Agency Worker',
+																											'Independent Contractor',
+																											'APAC Fixed Term Contract',
+																											'APAC Maximum Term Contract')
+																				)
+									)
+					)
+					)
+               
+					)
+	AND asg.PERIOD_OF_SERVICE_ID=(SELECT MAX(PERIOD_OF_SERVICE_ID) 
+								 FROM per_all_assignments_m 
+								 WHERE effective_latest_change = 'Y'
+									AND primary_assignment_flag = 'Y'
+									AND pay_report_utils.get_parameter_value_date('EFFECTIVE_DATE') BETWEEN effective_start_date AND effective_end_date
+									AND assignment_type in ('E','C')
+									AND person_id=asg.person_id
+									)
